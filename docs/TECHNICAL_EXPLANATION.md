@@ -65,6 +65,31 @@ El frontend no es solo "HTML", tiene muchísima lógica para mantener un estado 
 
 ---
 
+## 3. INFRAESTRUCTURA Y ARQUITECTURA GENERAL
+
+### A. La Arquitectura API REST (Next.js ↔ Django)
+*   **Qué hace:** El proyecto utiliza una arquitectura "desacoplada" (Headless E-commerce). Esto significa que el Frontend (lo que ve el usuario) y el Backend (la lógica de negocio) son dos programas completamente independientes que se comunican exclusivamente a través de una API REST.
+*   **Cómo funciona:** 
+    1.  Cuando un usuario entra a "Catálogo", Next.js hace una petición HTTP GET a la ruta `http://backend:8000/api/products/`.
+    2.  Django recibe la petición, consulta la base de datos, y convierte esos datos complejos en un formato de texto universal llamado **JSON** (usando *Serializers* de DRF).
+    3.  El Frontend recibe este JSON, lo procesa y pinta las tarjetas (las imágenes, los precios) en la pantalla.
+*   **Por qué importa:** Esta separación permite que el día de mañana puedas crear una aplicación móvil nativa (iOS/Android) y conectarla exactamente a la misma API, sin necesidad de reprogramar absolutamente nada del backend.
+
+### B. Contenerización con Docker y Docker Compose (`docker-compose.yml`)
+*   **Qué hace:** Docker empaqueta cada parte de tu aplicación (React, Python, Postgres) en "cajas" virtuales o contenedores independientes. El archivo `docker-compose.yml` es la receta que orquesta cómo estas cajas se levantan e interactúan juntas.
+*   **Cómo funciona:** 
+    *   **Entornos aislados:** Cada contenedor (Frontend y Backend) tiene su propio pequeño sistema operativo definido en un `Dockerfile`, donde le indicamos *"Instala estas versiones exactas de Node/Python, copia el código fuente, y correlo"*.
+    *   **Red Interna:** Docker Compose crea una red virtual privada para aislar tu base de datos del mundo exterior. Por eso el Backend puede comunicarse con la base de datos simplemente llamando al servidor `db` (host: `db`), sin importar en qué IP física estén instalados. El puerto `5432` de Postgres ni siquiera necesita estar expuesto al público.
+*   **Por qué importa:** Elimina el clásico problema de *"En mi computadora sí funciona"*. Cualquier persona, servidor de Amazon, o nube, que tenga Docker, puede levantar la arquitectura completa y funcional con el comando `docker-compose up`, garantizando idénticos resultados y versiones siempre.
+
+### C. Base de Datos Relacional (PostgreSQL)
+*   **Qué hace:** Almacena de manera permanente, estructurada y extremadamente segura toda la información del ecosistema (Usuarios, Variantes de Producto, Historial de Órdenes).
+*   **Cómo funciona:** A diferencia de bases de datos NoSQL (como MongoDB) donde la información se puede guardar de forma más libre, Postgres es **Relacional**. Esto significa que hace cumplir reglas estrictas garantizadas a través de Llaves Foráneas (Foreign Keys). 
+    *   *Ejemplo de consistencia:* La base de datos no te dejará bajo ningún término crear un `OrderItem` (un ítem de compra en una boleta) si el producto subyacente (`ProductVariant`) fue borrado del sistema, o si la orden (`Order`) a la que pertenece no existe.
+*   **Protección (Django ORM):** El programador no escribe consultas SQL puras (como `SELECT * FROM table`). Usamos el **ORM** (*Object-Relational Mapping*) de Django. El ORM traduce automáticamente nuestro código en Python a código SQL sanitizado y optimizado, protegiendo herméticamente a la base de datos de ataques informáticos como la *Inyección SQL*.
+
+---
+
 ## CONSEJOS PARA LA PRESENTACIÓN
 
 *   **Si te preguntan "Por qué Stripe en Mock y no en Real":** "La lógica de negocio está completa: tenemos los serializers de Django recibiendo y creando intents. Está mockeado exclusivamente para esta demo offline/local y poder ver cómo el PaymentIntentId se mapea perfectamente a nuestra base de datos posicional, pero la integración SDK (Librería) está instalada y requiriendo solo las llaves de entorno para producción."
