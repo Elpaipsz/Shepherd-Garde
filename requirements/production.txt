@@ -1,0 +1,6 @@
+-r base.txt
+
+# Cloud dependencies could go here later, such as:
+# boto3>=1.29.0
+# django-storages>=1.14.2
+# sentry-sdk>=1.35.0
