@@ -970,12 +970,7 @@ El docente sugirió simular pagos que descuenten saldo o generen un cheque. El `
 
 ## 19. Equipo
 
-| Integrante | Rol |
-|-----------|-----|
-| *(nombre)* | Arquitecto Principal |
-| *(nombre)* | Arquitecto de Usabilidad |
-| *(nombre)* | Desarrollador Backend |
-| *(nombre)* | Desarrollador Frontend |
+Solo Felipe Giraldo Neira
 
 **Repositorio:** [https://github.com/Elpaipsz/Shepherd-Garde](https://github.com/Elpaipsz/Shepherd-Garde)  
 **Curso:** Tópicos Especiales en Ingeniería de Software  
