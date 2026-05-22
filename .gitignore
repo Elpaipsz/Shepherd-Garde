@@ -58,3 +58,23 @@ postgres_data/
 *.swo
 .DS_Store
 Thumbs.db
+
+# Scripts de datos de demo (legacy del Entregable 1)
+scripts/
+
+# Documentos binarios y PDFs académicos (no van en el repo de código)
+*.docx
+*.pdf
+*.xlsx
+
+# Archivos de presentación interna (guiones, etc.)
+docs/PRESENTATION_GUIDE.md
+docs/PRESENTATION_SCRIPT.md
+docs/product*.md
+
+# Embedded repos / submódulos no configurados
+shepherd_admin_core/
+
+# Scripts de arranque locales de Windows
+*.bat
+start_all.bat
