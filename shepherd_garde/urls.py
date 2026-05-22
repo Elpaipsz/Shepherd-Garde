@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from catalog.views import PublicCatalogAPIView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -26,6 +27,9 @@ urlpatterns = [
     path('api/v1/auth/', include('users.urls')),
     path('api/v1/catalog/', include('catalog.urls')),
     path('api/v1/shop/', include('shop.urls')),
+    
+    # Public API for external teams (Entregable 2)
+    path('api/public/', PublicCatalogAPIView.as_view(), name='public-api-catalog'),
 ]
 
 if settings.DEBUG:

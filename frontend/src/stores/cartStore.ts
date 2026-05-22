@@ -47,16 +47,13 @@ export const useCartStore = create<CartState>((set, get) => ({
     fetchCart: async () => {
         set({ isLoading: true, error: null });
         try {
-            // Requires auth or a session ID. For now we assume the user is logged in, 
-            // or the backend supports anonymous carts via session.
+
             const response = await fetchAPI('/shop/cart/');
             
             if (response.session_id && typeof window !== 'undefined') {
                 localStorage.setItem('sg_cart_session', response.session_id);
             }
 
-            // Calculate total from items since backend might not return a grand total directly
-            // or we calculate it here for display.
             const total = response.items.reduce((acc: number, item: any) => acc + parseFloat(item.subtotal), 0);
             
             set({ items: response.items, total, isLoading: false });

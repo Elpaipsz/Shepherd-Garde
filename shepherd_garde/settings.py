@@ -11,6 +11,11 @@ from datetime import timedelta
 # ──────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Load environment variables from .env file
+import environ
+env = environ.Env()
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
 SECRET_KEY = os.environ.get('SECRET_KEY')
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY environment variable is not set. Refusing to start.")

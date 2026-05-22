@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     CartView, CartItemView, CartItemDetailView, CartMergeView,
     AddressListCreateView, AddressDetailView,
-    OrderListView, CheckoutView, StripeWebhookView
+    OrderListView, CheckoutView, StripeWebhookView, WeatherView
 )
 
 urlpatterns = [
@@ -23,4 +23,7 @@ urlpatterns = [
     path('orders/', OrderListView.as_view(), name='order-list'),
     path('orders/checkout/', CheckoutView.as_view(), name='checkout'),
     path('orders/webhook/payment-success/', StripeWebhookView.as_view(), name='stripe-webhook'),
+    
+    # Terceros
+    path('weather/', WeatherView.as_view(), name='weather'),
 ]

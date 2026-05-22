@@ -2,6 +2,10 @@ import uuid
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.core.cache import cache
+
+def invalidate_public_api_cache():
+    cache.delete('public_catalog_api_data')
 
 class TimeStampedModel(models.Model):
     """Clase base abstracta con campos de auditoría."""
@@ -59,6 +63,14 @@ class Product(TimeStampedModel):
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        invalidate_public_api_cache()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        invalidate_public_api_cache()
+
 
 class ProductVariant(TimeStampedModel):
     """
@@ -86,6 +98,14 @@ class ProductVariant(TimeStampedModel):
 
     def __str__(self):
         return f"{self.product.name} - {self.size} ({self.color})"
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        invalidate_public_api_cache()
+
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        invalidate_public_api_cache()
 
 
 from django.conf import settings

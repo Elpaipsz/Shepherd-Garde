@@ -1,5 +1,6 @@
 import uuid
 from rest_framework import serializers
+from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -26,7 +27,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         """Normalize email: strip whitespace and lowercase."""
         normalized = value.strip().lower()
         if User.objects.filter(email=normalized).exists():
-            raise serializers.ValidationError("A user with this email already exists.")
+            raise serializers.ValidationError(_("A user with this email already exists."))
         return normalized
 
     def validate_password(self, value):
@@ -43,13 +44,13 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_first_name(self, value):
         cleaned = value.strip()
         if len(cleaned) > 50:
-            raise serializers.ValidationError("First name cannot exceed 50 characters.")
+            raise serializers.ValidationError(_("First name cannot exceed 50 characters."))
         return cleaned
 
     def validate_last_name(self, value):
         cleaned = value.strip()
         if len(cleaned) > 50:
-            raise serializers.ValidationError("Last name cannot exceed 50 characters.")
+            raise serializers.ValidationError(_("Last name cannot exceed 50 characters."))
         return cleaned
 
     def create(self, validated_data):

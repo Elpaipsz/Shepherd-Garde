@@ -42,12 +42,12 @@ Esta es la función más importante de tu API. Combina varias herramientas avanz
 El frontend no es solo "HTML", tiene muchísima lógica para mantener un estado fluido (App Router).
 
 ### A. Estado del Carrito Ultrarrápido (Zustand)
-*Archivo:* `frontend/src/lib/store.ts`
+*Archivo:* `frontend/src/stores/cartStore.ts`
 
 *   **Librería `Zustand`:** En lugar de usar React Context (que es lento y causa recargas innecesarias), usamos Zustand para crear un estado global llamado `useCartStore`.
 *   **Función `addItem` y `removeItem`:**
     *   **Qué hace:** Cuando agregas un producto, no recargas la pestaña ni haces peticiones HTTP lentas en ese momento. Zustand toma la data del producto, la inyecta en estado reactivo, e inmediatamente actualiza el numerito del carrito arriba a la derecha. 
-    *   **Persistencia:** Utiliza un middleware llamado `persist` para guardar silenciosamente el carrito en el `localStorage` del navegador. Si cierras la pestaña y la abres a los 3 días, tu carrito sigue ahí intacto sin necesidad de que el backend guarde esa basura temporal.
+*   **Persistencia:** Guarda de manera segura el identificador del carrito (`sg_cart_session`) o el token de acceso en el `localStorage` del navegador. Esto permite que, si cierras la pestaña y la abres después, tu sesión y tu carrito sigan ahí intactos sin necesidad de que el backend guarde esa basura temporal de carritos abandonados en la base de datos principal.
 
 ### B. Comunicación con el Backend (`fetchAPI`)
 *Archivo:* `frontend/src/lib/api.ts` -> **Función `fetchAPI(endpoint, options)`**

@@ -10,9 +10,12 @@ from .serializers import (
 from django.utils import timezone
 from django.db import transaction
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 import datetime
 import uuid
 import stripe
+import requests
+from .payments import get_payment_processor
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -70,24 +73,25 @@ class CartItemView(views.APIView):
 
         # ── Input Validation (UUID) ────────────────────────────────────
         if not variant_id:
-            return Response({'error': 'variant_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('variant_id is required'))}, status=status.HTTP_400_BAD_REQUEST)
         if not is_valid_uuid(str(variant_id)):
-            return Response({'error': 'Invalid variant_id format'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('Invalid variant_id format'))}, status=status.HTTP_400_BAD_REQUEST)
         if quantity < 1 or quantity > 10:
-            return Response({'error': 'Quantity must be between 1 and 10'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('Quantity must be between 1 and 10'))}, status=status.HTTP_400_BAD_REQUEST)
         # ─────────────────────────────────────────────────────────────
 
         try:
             variant = ProductVariant.objects.get(id=variant_id)
         except ProductVariant.DoesNotExist:
-            return Response({'error': 'variant_not_found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': str(_('variant_not_found'))}, status=status.HTTP_404_NOT_FOUND)
 
         # Hype Check: no se puede agregar al carrito si el Drop no ha sido liberado
         collection = variant.product.collection
         if collection.is_droppable() and collection.release_date and collection.release_date > timezone.now():
+            msg = _('Este artículo pertenece a un Drop que será liberado el %(date)s.') % {'date': collection.release_date.isoformat()}
             return Response({
                 'error': 'product_not_released',
-                'message': f'Este artículo pertenece a un Drop que será liberado el {collection.release_date.isoformat()}.'
+                'message': str(msg)
             }, status=status.HTTP_400_BAD_REQUEST)
 
         cart_item, created = CartItem.objects.get_or_create(cart=cart, variant=variant)
@@ -118,11 +122,11 @@ class CartItemDetailView(views.APIView):
     def patch(self, request, pk):
         item = self.get_item(request, pk)
         if item is None:
-            return Response({'error': 'item_not_found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': str(_('item_not_found'))}, status=status.HTTP_404_NOT_FOUND)
 
         quantity = request.data.get('quantity')
         if quantity is None or int(quantity) < 1:
-            return Response({'error': 'invalid_quantity'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('invalid_quantity'))}, status=status.HTTP_400_BAD_REQUEST)
 
         item.quantity = int(quantity)
         item.save()
@@ -134,7 +138,7 @@ class CartItemDetailView(views.APIView):
     def delete(self, request, pk):
         item = self.get_item(request, pk)
         if item is None:
-            return Response({'error': 'item_not_found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': str(_('item_not_found'))}, status=status.HTTP_404_NOT_FOUND)
         item.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -158,7 +162,7 @@ class CartMergeView(views.APIView):
     def post(self, request):
         session_id = request.data.get('session_id')
         if not session_id or not is_valid_uuid(str(session_id)):
-            return Response({'error': 'valid session_id required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('valid session_id required'))}, status=status.HTTP_400_BAD_REQUEST)
 
         # Carrito de destino (usuario autenticado)
         user_cart, _ = Cart.objects.get_or_create(user=request.user)
@@ -230,7 +234,7 @@ class AddressDetailView(views.APIView):
     def delete(self, request, pk):
         address = self.get_object(pk, request.user)
         if address is None:
-            return Response({'error': 'not_found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': str(_('not_found'))}, status=status.HTTP_404_NOT_FOUND)
         address.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -259,15 +263,15 @@ class CheckoutView(views.APIView):
         shipping_address_id = request.data.get('shipping_address_id')
 
         if not cart.items.exists():
-            return Response({'error': 'empty_cart'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('empty_cart'))}, status=status.HTTP_400_BAD_REQUEST)
 
         if not shipping_address_id:
-            return Response({'error': 'shipping_address_required'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('shipping_address_required'))}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             address = Address.objects.get(id=shipping_address_id, user=request.user)
         except Address.DoesNotExist:
-            return Response({'error': 'address_not_found'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'error': str(_('address_not_found'))}, status=status.HTTP_404_NOT_FOUND)
 
         # Pessimistic locking para evitar overselling en Drops
         variant_ids = list(cart.items.values_list('variant_id', flat=True))
@@ -304,24 +308,22 @@ class CheckoutView(views.APIView):
             )
         cart.items.all().delete()
 
-        # Intentamos Stripe, pero si falla/no está, marcamos como pagado automáticamente para la demo
-        try:
-            intent = stripe.PaymentIntent.create(
-                amount=int(total_amount * 100),
-                currency='usd',
-                metadata={'order_id': str(order.id)}
-            )
-            client_secret = intent.client_secret
-            order.payment_intent_id = client_secret
+        # Inyección de Dependencias (DI): Usamos la capa de servicios para procesar el pago
+        processor = get_payment_processor()
+        payment_result = processor.process_payment(amount=float(total_amount), order_id=str(order.id))
+
+        if payment_result['status'] == 'failed':
+            # Si el procesador falla explícitamente (ej. Stripe sin keys)
+            order.status = 'failed'
             order.save()
-        except Exception as e:
-            # Si Stripe no está configurado o hay error en dev, 
-            # simulamos éxito para que aparezca pagada en el admin
-            client_secret = "pi_mock_123_demo"
+            return Response({'error': str(_('payment_failed')), 'detail': payment_result.get('error')}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Actualizamos la orden con el resultado del pago
+        order.payment_intent_id = payment_result.get('transaction_id')
+        if payment_result['status'] == 'paid':
             order.status = 'paid'
-            order.payment_intent_id = client_secret
-            order.save()
-            print(f"Checkout simulation: Order {order.id} marked as 'paid' (Stripe error: {e})")
+            
+        order.save()
 
         expires_at = timezone.now() + datetime.timedelta(minutes=15)
 
@@ -330,7 +332,8 @@ class CheckoutView(views.APIView):
             'status': order.status,
             'total_amount': str(order.total_amount),
             'expires_at': expires_at.isoformat(),
-            'payment_intent_client_secret': client_secret
+            'payment_intent_client_secret': payment_result.get('transaction_id'),
+            'payment_provider': payment_result.get('provider')
         }, status=status.HTTP_201_CREATED)
 
 
@@ -346,9 +349,9 @@ class StripeWebhookView(views.APIView):
                 payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
             )
         except ValueError:
-            return Response({'error': 'invalid_payload'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('invalid_payload'))}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.SignatureVerificationError:
-            return Response({'error': 'invalid_signature'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': str(_('invalid_signature'))}, status=status.HTTP_400_BAD_REQUEST)
 
         if event['type'] == 'payment_intent.succeeded':
             payment_intent = event['data']['object']
@@ -364,3 +367,26 @@ class StripeWebhookView(views.APIView):
                     pass
 
         return Response({'received': True}, status=status.HTTP_200_OK)
+
+
+# ──────────────────────────────────────────────
+# TERCEROS (WEATHER)
+# ──────────────────────────────────────────────
+
+class WeatherView(views.APIView):
+    """
+    GET /shop/weather/
+    Consumo de un servicio de terceros (Open-Meteo) tal como se pide en el Entregable 2.
+    Devuelve el clima actual de Medellín.
+    """
+    permission_classes = (AllowAny,)
+
+    def get(self, request):
+        try:
+            # Consumo real de API externa
+            resp = requests.get('https://api.open-meteo.com/v1/forecast?latitude=6.2518&longitude=-75.5636&current_weather=true', timeout=5)
+            resp.raise_for_status()
+            data = resp.json()
+            return Response(data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(_('weather_service_unavailable')), 'detail': str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)

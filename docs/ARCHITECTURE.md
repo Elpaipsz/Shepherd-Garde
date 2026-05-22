@@ -95,3 +95,58 @@ def calculate_cart_total(cart_id: uuid.UUID, apply_taxes: bool = True) -> Decima
 1. **Custom User Model**: Desde el día 1, implementaremos un Custom User Model (heredando de `AbstractUser` o `AbstractBaseUser`) en la app `users`. Es crítico hacerlo antes de la primera migración.
 2. **Modelos Base**: Usaremos un mixin abstracto (`TimeStampedModel`) que contenga `created_at` y `updated_at` en casi todas nuestras tablas de negocio para auditoría.
 3. **Fat Models, Skinny Views**: Mantendremos la lógica de negocio acoplada a los modelos, managers o "servicios" (services layer), y dejaremos que las vistas (Views/ViewSets) se encarguen puramente de peticiones y respuestas HTTP.
+
+---
+
+## 6. Diagrama de Arquitectura e Integraciones
+
+El siguiente diagrama ilustra la arquitectura de contenedores, la interacción del frontend con el backend y las integraciones con servicios externos (incluyendo la indicación de la excepción sobre el consumo del equipo anterior):
+
+```mermaid
+graph TD
+    subgraph ClientSpace ["Espacio del Cliente"]
+        Browser["Navegador Web (Chrome/Safari)"]
+    end
+
+    subgraph DockerCompose ["Entorno Docker Compose (Orquestación Local)"]
+        Frontend["Next.js Frontend Container<br/>(Puerto 3000 / 8001)"]
+        Backend["Django Backend Container<br/>(Puerto 8000)"]
+        DB[(PostgreSQL Database Container<br/>Puerto 5432)]
+    end
+
+    subgraph ExternalAPIs ["Servicios Externos (Terceros)"]
+        OpenMeteo["Open-Meteo API<br/>(Clima de Medellín)"]
+        StripeAPI["Stripe Payment Gateway<br/>(DI StripePaymentProcessor)"]
+    end
+
+    subgraph PeerConsumers ["Consumidores Académicos (Siguiente Equipo)"]
+        NextTeam["Siguiente Equipo de la Clase"]
+    end
+
+    %% Flujos de Navegación e Interacción
+    Browser -->|1. Renderiza e Interactúa UI| Frontend
+    Browser -->|2. Peticiones API REST (JWT)| Backend
+    
+    %% Flujos del Frontend
+    Frontend -->|GET /api/v1/... (Data Fetching)| Backend
+    
+    %% Flujos del Backend
+    Backend -->|Lectura / Escritura SQL| DB
+    Backend -->|GET (Clima Medellín)| OpenMeteo
+    Backend -->|Process Payment / Webhooks| StripeAPI
+    
+    %% Consumo Público (Entregable 2)
+    NextTeam -->|GET /api/public/<br/>(Consumo Catálogo JSON)| Backend
+
+    classDef container fill:#e1f5fe,stroke:#0288d1,stroke-width:2px;
+    classDef external fill:#efebe9,stroke:#5d4037,stroke-width:2px;
+    classDef client fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+    
+    class Frontend,Backend,DB container;
+    class OpenMeteo,StripeAPI external;
+    class Browser client;
+    class NextTeam client;
+```
+
+> [!NOTE]
+> **Nota sobre Consumo del Equipo Precedente:** De acuerdo con las instrucciones del docente, el consumo de la API del equipo anterior (con ruta `/productos-aliados`) se omitió ya que dicho equipo no pudo realizar el despliegue del servicio en la nube (Cloud).
